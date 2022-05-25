@@ -1,0 +1,288 @@
+---
+title: "Bellabeat Capstone Project"
+author: "Sharon Makunura"
+date: '2022-05-12'
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Introduction
+
+This project was completed from track 1 of the Google Data Analytics capstone project which I recently completed.  I wwanted to keep practising and try different challenges.  My analysis process proceeded in the following manner. 
+
+### 1. Ask
+
+I began by defining the problem.
+
+
+The key business task for this project is to identify smart device usage trends, and apply them to one Bellabeat product.  I chose Spring, which tracks hydration and water intake.  I will then need to determine how these insights may influence Bellabeats marketing approach for Spring.  My key stakeholders are the executive, including Urska and Sando the founders; as well as the marketing analytics team at Bellabeat.  
+
+### 2: Prepare
+
+My data is stored in a SQL database.  I will be using BigQuery for it.  The dataset has numerous tables.  I will use the tables in narrow format.  There are no privacy or credibility issues with the dataset.  The data ROCCs.  
+
+### 3: Process 
+
+I began by checking for nulls in the ID numbers across all tables.  The were no nulls or missing values so next I checked the structure of the tables.  I formatted the numerical values to round of to 2 decimal places.  In addition, I formatted the date columns to split date and time where appropriate.  A full list of processing is available as a separate table.  
+
+### 4: Analyze  
+
+I performed the analysis process in R.  
+
+
+##### Setting up the R environment
+
+These are the packages set up for the analysis.
+
+```{r warning=FALSE, echo=FALSE}
+library(tidyverse)
+
+daily_activity<- read.csv("/cloud/project/bella-beat-zip/dailyActivity_merged.csv")
+hourly_steps<- read.csv("/cloud/project/bella-beat-zip/hourly-steps.csv")
+hourly_calories<- read.csv("/cloud/project/bella-beat-zip/hourly-calories.csv")
+minute_steps<- read.csv("/cloud/project/bella-beat-zip/minutes-steps.csv")
+minute_sleep<- read.csv("/cloud/project/bella-beat-zip/minute-sleep.csv")
+minute_calories<- read.csv("/cloud/project/bella-beat-zip/minute-calories.csv")
+daily_sleep<- read.csv("/cloud/project/bella-beat-zip/sleep-day.csv")
+weight_log<- read.csv("/cloud/project/bella-beat-zip/weight-log.csv")
+
+```
+
+The following is a list of tables I imported for analysis:
+
+* dailyActivity_merged
+* hourly-calories
+* hourly-steps
+* minute-calories
+* minute-sleep
+* minutes-steps
+* sleep-day
+* weight-log.
+
+Each of these was saved as a data frame. Some additional cleaning was needed.  The analysis in SQL resulted in some column headers being stored as observations.  I removed these invalid rows from the affected data frames.
+
+```{r delete_header_rows, echo=FALSE, warning=FALSE}
+minute_steps <- minute_steps[-1,]
+minute_sleep<-minute_sleep[-nrow(minute_sleep),]
+daily_sleep<-daily_sleep[-nrow(daily_sleep),]
+minute_calories<-minute_calories[-1,]
+hourly_steps<-hourly_steps[-1,]
+hourly_calories<-hourly_calories[-1,]
+
+```
+
+Next, I matched the date column for all the data frames so they could match and be easier to reference in functions.
+
+```{r change-date-column, echo=FALSE, warning=FALSE}
+daily_activity<-rename(daily_activity, activity_date=ActivityDate)
+
+```
+
+I also formatted all the dates to dttm date objects.
+
+```{r formart-date, echo=FALSE, warning=FALSE}
+
+daily_activity$activity_date=strptime(daily_activity$activity_date,format = "%m/%d/%Y")
+hourly_calories$activity_date=strptime(hourly_calories$activity_date,format = "%m/%d/%Y")
+hourly_steps$activity_date=strptime(hourly_steps$activity_date,format = "%m/%d/%Y")
+minute_calories$activity_date=strptime(minute_calories$activity_date,format = "%m/%d/%Y")
+minute_sleep$activity_date=strptime(minute_sleep$activity_date,format = "%m/%d/%Y")
+minute_steps$activity_date=strptime(minute_steps$activity_date,format = "%m/%d/%Y")
+weight_log$activity_date=strptime(weight_log$activity_date,format = "%m/%d/%Y")
+daily_sleep$activity_date=strptime(daily_sleep$activity_date, format = "%m/%d/%Y")
+
+```
+
+##### Preview of resulting data frames
+
+```{r glimpse-data, echo=FALSE, warning=FALSE}
+glimpse(daily_activity)
+glimpse(hourly_steps)
+glimpse(weight_log)
+
+```
+
+Next, I took a look at the data frames to determine the number of unique Ids/users in each.
+
+```{r unique-Id, echo=FALSE, warning=FALSE}
+length(unique(daily_activity$Id))
+length(unique(minute_sleep$Id))
+length(unique(hourly_calories$Id))
+length(unique(minute_calories$Id))
+length(unique(daily_sleep$Id))
+length(unique(weight_log$Id))
+```
+The total number of users is 33.  All the users appeared in 3 of the data frames.  The lowest number of users was in the weight_log data frame with less than a quarter of all the users using it.   
+
+
+Next, I wanted to determine the frequency of recording data by determining how many times each user appears in a dataframe.  To achieve this I created a function using table().  Then, I applied the function to each of the data frames. I saved the results as new data frames for each set.
+
+
+```{r frequency-function, echo=FALSE, warning=FALSE}
+freqFunc <-function(df){
+  freqDF<-as.data.frame(table(df$Id))
+}
+
+daily_activity_freq<-freqFunc(daily_activity)
+daily_sleep_freq<-freqFunc(daily_sleep)
+hourly_calories_freq<-freqFunc(hourly_calories)
+hourly_steps_freq<-freqFunc(hourly_steps)
+minute_calories_freq<-freqFunc(minute_calories)
+minute_sleep_freq<-freqFunc(minute_sleep)
+minute_steps_freq<-freqFunc(minute_steps)
+weight_log_freq<-freqFunc(weight_log)
+
+#rename freq data frame columns
+renameFunc<-function(df,new_name){
+  old_name<-c("Var1","Freq")
+  df%>%
+    rename_at(all_of(old_name), ~new_name)
+}
+
+anames<-c("Id","daily_activity_freq")
+daily_activity_freq<-renameFunc(daily_activity_freq,anames )
+bnames<-c("Id","daily_sleep_freq")
+daily_sleep_freq<-renameFunc(daily_sleep_freq, bnames)
+cnames<-c("Id","hourly_calories_freq")
+hourly_calories_freq<-renameFunc(hourly_calories_freq, cnames)
+dnames<-c("Id","hourly_steps_freq")
+hourly_steps_freq<-renameFunc(hourly_steps_freq, dnames)
+enames<-c("Id","minute_calories_freq")
+minute_calories_freq<-renameFunc(minute_calories_freq, enames)
+fnames<-c("Id","minute_sleep_freq")
+minute_sleep_freq<-renameFunc(minute_sleep_freq, fnames)
+gnames<-c("Id","minute_steps_freq")
+minute_steps_freq<-renameFunc(minute_steps_freq, gnames)
+hnames<-c("Id","weight_log_freq" )
+weight_log_freq<-renameFunc(weight_log_freq, hnames)
+```
+
+These results were then joined together to create a combined data frame that shows frequency of records per user and per service.  A summary of the resulting data frame is shown below:
+
+
+```{r join-frequency-dataframes, echo=FALSE, warning=FALSE}
+combo_freq<-daily_activity_freq%>%
+  full_join(daily_sleep_freq, by="Id")%>%
+  full_join(hourly_calories_freq, by="Id")%>%
+  full_join(hourly_steps_freq,by="Id")%>%
+  full_join(minute_calories_freq, by="Id")%>%
+  full_join(minute_sleep_freq, by="Id")%>%
+  full_join(minute_steps_freq,by="Id")%>%
+  full_join(weight_log_freq,by="Id")
+
+glimpse(combo_freq)
+```
+
+With this data frame I was able to determine the number of users who used all the services.  The results show that only 6 users used all the services under review.
+
+```{r all-round-users, echo=FALSE, warning=FALSE}
+count(combo_freq[complete.cases(combo_freq),])
+
+```
+I went on to further group the users by how many services their Id is not present in.  The table below summarizes the results:
+
+```{r not-present-in, echo=FALSE, warning=FALSE}
+combo_freq_summary<-combo_freq %>%
+  dplyr::select(where(is.numeric))%>%
+  rowwise() %>%
+  mutate(not_present_in=sum(is.na(c_across(where(is.numeric)))))
+
+combo_freq_summary%>%
+  group_by(not_present_in)%>%
+  tally()
+```
+The results show that only 7 users recorded only their daily activity and did not record any of the other services.  Additionally, all 18 of the users who were not present in only one service did not appear in the weight-log record as shown below.  
+
+```{r no-weight-log, warning=FALSE, echo=FALSE}
+freq_df<-as.data.frame(combo_freq_summary)
+
+
+freq_df%>%
+  filter(freq_df$not_present_in==1)%>%
+  summarise_all(list(~sum(is.na(.))))
+
+```
+
+I implemented functions to study the most popular days for recording data 
+```{r freq-days, echo=FALSE, warning= FALSE}
+#ensure data formats match
+daily_sleep$Id<-as.numeric(daily_sleep$Id)
+
+#create function to add day column to df
+dayFunc<-function (df){
+  df%>%
+    mutate(day=strftime(df$activity_date, "%A"))
+}
+
+#implement functions
+daily_activity<-dayFunc(daily_activity)
+daily_sleep<-dayFunc(daily_sleep)
+weight_log<-dayFunc(weight_log)
+```
+
+```{r plot-days, echo=FALSE, warning=FALSE}
+
+#reorganize day column for easier plotting
+daily_activity$day <- factor(daily_activity$day, levels= c("Sunday", "Monday", 
+                                         "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+
+daily_sleep$day <- factor(daily_sleep$day, levels= c("Sunday", "Monday", 
+                                                           "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+
+weight_log$day <- factor(weight_log$day, levels= c("Sunday", "Monday", 
+                                                     "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+weight_log$IsManualReport<-factor(weight_log$IsManualReport, levels=c("true","false"))
+
+###visualize most frequent day
+
+ggplot(daily_activity, aes(x=day))+ 
+  geom_bar(fill="#FF6666")+
+  theme_classic()+
+  labs(x="Days",y="No. of records",
+       title="        Daily Activity Record Counts by Day")
+
+
+ggplot(daily_sleep, aes(x=day))+ 
+  geom_bar(fill="#FF6666")+
+  theme_classic()+
+  labs(x="Days",y="No. of records",
+       title="        Daily Sleep Record Counts by Day")
+  
+
+ggplot(weight_log, aes(x=day))+ 
+  geom_bar(fill="#FF6666")+
+  theme_classic()+
+  labs(x="Days",y="No. of records",
+       title="        Weight Record Counts by Day")
+
+```
+
+The results show the most popular days to be week days, particularly Tuesday to Thursday.  For the weight log, the most common record type was manual.  
+
+
+### 5: Share
+
+The results of the analysis show that users of the app use the app regularly to record daily activity.  Variations in recording frequency exist for sleep and weight log.  Weight log is the least popular app, although manual entry is the most popular mode of recording weight data. This is significant for Bellabeat if they have details that can be manually input.  
+
+To share these insights with the executives I used Google Slides to create a presentation.  I also created a separate detailed report for the marketing analytics team.  
+
+### 6: Act
+
+By this final stage I was ready to share my findings with the stakeholders.  The conclusion of my analysis suggested to me that the most powerful marketing aspect for Spring is its packaging.  
+
+To share my insights and reports I utilized GitHub and Google Sites.  My scripts and documentation can be accessed on [GitHub](https://github.com/SharonMakunura/Google-Data-Analytics-Capstone-Project-2).  The summary and link to the presentation can be found on [Google Sites](https://sites.google.com/view/sharonmakunura/my-projects/copy-of-google-data-analytics-second-project).  
+
+## Conclusion
+
+While the data for this analysis is very minimal, I was able to explore different approaches to coding in SQL and R in a satisfactory manner, as well as review the analysis approach to complete a project. 
+
+
+
+
+
+
+
