@@ -1,0 +1,38 @@
+SELECT * 
+FROM `bellabeats-22.bellabeats.dailyActivity_merged` 
+where
+Id is null or ActivityDate is null or TotalSteps is null or TotalDistance is null or TrackerDistance is null 
+
+SELECT * 
+FROM `bellabeats-22.bellabeats.dailyCalories_merged` 
+where
+Id is null or ActivityDay is null or Calories is null 
+
+SELECT 
+length(Time)
+FROM `bellabeats-22.bellabeats.heartrate_seconds_merged` 
+where
+length(Time)<19 or length(Time)>21
+
+***split date and time
+SELECT
+  (SPLIT(Date, ' '))[safe_ordinal(2)]
+FROM `bellabeats-22.bellabeats.weightLogInfo_merged` 
+
+*** figure out different time lengths
+SELECT length(ActivityHour)
+
+FROM `bellabeats-22.bellabeats.hourlyCalories_merged` 
+group by length(ActivityHour)
+
+***nested select query with alias table
+SELECT s.Id,s.activity_date,
+(SPLIT(s.activity_hour, ':'))[safe_ordinal(1)] as hour,
+(SPLIT(s.activity_hour, ':'))[safe_ordinal(2)] as minute,
+s.calories 
+ FROM (SELECT Id,
+        (SPLIT(ActivityMinute, ' '))[safe_ordinal(1)] as activity_date,
+        (SPLIT(ActivityMinute, ' '))[safe_ordinal(2)] as activity_hour,
+        (SPLIT(ActivityMinute, ' '))[safe_ordinal(3)] as activity_time,
+        round(safe_cast(Calories AS numeric),2) as calories
+      FROM `bellabeats-22.bellabeats.minuteCaloriesNarrow_merged` ) as s
